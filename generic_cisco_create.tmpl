@@ -1,0 +1,77 @@
+!
+!
+! This configuration part is shared for all the tunnels in the router.
+! It will be applied again and again for each deployment unnecessarily
+!
+!
+conf t
+!
+crypto isakmp policy {config:isakmp_policy_number}
+   encryption aes 256
+   authentication pre-share
+   group 2
+   lifetime 28800
+   hash sha256
+exit
+!
+crypto ipsec transform-set aws-transform-set esp-aes 256 esp-sha-hmac 
+   mode tunnel
+exit
+!
+crypto ipsec profile aws-ipsec-profile
+   set pfs group5
+   set security-association lifetime seconds 3600
+   set transform-set aws-transform-set
+exit
+!
+crypto ipsec df-bit clear
+!
+crypto isakmp keepalive 10 10 on-demand
+!
+crypto ipsec security-association replay window-size 128
+!
+crypto ipsec fragmentation before-encryption
+!
+!
+! This configuration part is per tunnel, it's not shared with any other deployment
+!
+!
+crypto keyring keyring-{vpn_connection_id}-{repetition}
+   local-address {config:uplink_address}
+   pre-shared-key address {xml:vpn_gateway/tunnel_outside_address/ip_address} key {xml:ike/pre_shared_key}
+exit
+!
+crypto isakmp profile isakmp-{vpn_connection_id}-{repetition}
+   local-address {config:uplink_address}
+   match identity address {xml:vpn_gateway/tunnel_outside_address/ip_address}
+   keyring keyring-{vpn_connection_id}-{repetition}
+exit
+!
+interface Tunnel {conflict-number:interface Tunnel}
+   description {vpn_connection_id}
+   ip address {xml:customer_gateway/tunnel_inside_address/ip_address} {xml:vpn_gateway/tunnel_inside_address/network_mask}
+   ip virtual-reassembly
+   tunnel source {config:uplink_address}
+   tunnel destination {xml:vpn_gateway/tunnel_outside_address/ip_address}
+   tunnel mode ipsec ipv4
+   tunnel protection ipsec profile aws-ipsec-profile
+   ip tcp adjust-mss 1387
+   no shutdown
+exit
+!
+router bgp {xml:customer_gateway/bgp/asn}
+   neighbor {xml:vpn_gateway/tunnel_inside_address/ip_address} remote-as {xml:vpn_gateway/bgp/asn}
+   neighbor {xml:vpn_gateway/tunnel_inside_address/ip_address} activate
+   neighbor {xml:vpn_gateway/tunnel_inside_address/ip_address} timers 10 30 30
+   address-family ipv4 unicast 
+      neighbor {xml:vpn_gateway/tunnel_inside_address/ip_address} remote-as {xml:vpn_gateway/bgp/asn}
+      neighbor {xml:vpn_gateway/tunnel_inside_address/ip_address} timers 10 30 30
+      neighbor {xml:vpn_gateway/tunnel_inside_address/ip_address} default-originate
+      neighbor {xml:vpn_gateway/tunnel_inside_address/ip_address} activate
+      neighbor {xml:vpn_gateway/tunnel_inside_address/ip_address} soft-reconfiguration inbound
+      network {config:advertised_network}
+   exit
+exit
+!
+exit
+

@@ -1,0 +1,17 @@
+!
+!    
+!
+conf t
+!
+router bgp {xml:customer_gateway/bgp/asn}
+   no neighbor {xml:vpn_gateway/tunnel_inside_address/ip_address}
+exit
+!
+no interface Tunnel {conflict-number:interface Tunnel}
+!
+no crypto isakmp profile isakmp-{vpn_connection_id}-{repetition}
+!
+no crypto keyring keyring-{vpn_connection_id}-{repetition}
+!
+exit
+!
